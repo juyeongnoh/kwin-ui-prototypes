@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>관리자 UI</title>
+  <link rel="stylesheet" href="../css/style.css" />
+  <style>
+    /* ── 필터 바 ── */
+    .filter-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .filter-btn {
+      padding: 5px 12px;
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      background: var(--surface);
+      font-size: 12px;
+      cursor: pointer;
+      color: var(--text-sub);
+      transition: background 0.12s, border-color 0.12s, color 0.12s;
+    }
+    .filter-btn.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    /* ── 진행률 바 ── */
+    .progress-track {
+      height: 4px;
+      background: var(--accent-bg);
+      border-radius: 2px;
+      overflow: hidden;
+      margin-top: 6px;
+    }
+    .progress-fill {
+      height: 100%;
+      background: var(--accent);
+      border-radius: 2px;
+      transition: width 0.3s;
+    }
+
+    /* ── 과제 카드 그리드 ── */
+    .project-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: var(--gap);
+    }
+    .project-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      cursor: pointer;
+      transition: border-color 0.15s;
+    }
+    .project-card:hover { border-color: var(--accent); }
+
+    .project-card-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .project-title {
+      font-size: 14px;
+      font-weight: 600;
+      line-height: 1.4;
+    }
+    .project-meta {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      font-size: 12px;
+      color: var(--text-sub);
+    }
+    .project-meta span { display: flex; align-items: center; gap: 4px; }
+
+    .project-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: auto;
+    }
+
+    /* 담당자 아바타 */
+    .avatars { display: flex; gap: -4px; }
+    .avatar {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: var(--accent-bg);
+      border: 2px solid var(--surface);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      color: var(--text-sub);
+      margin-left: -6px;
+      font-weight: 600;
+    }
+    .avatar:first-child { margin-left: 0; }
+
+    /* D-day 태그 */
+    .dday {
+      font-size: 11px;
+      font-weight: 500;
+      padding: 2px 8px;
+      border-radius: 20px;
+      border: 1px solid;
+    }
+    .dday-ok    { color: #2a6a2a; background: #e8f4e8; border-color: #9acc9a; }
+    .dday-warn  { color: #7a5a00; background: #fdf4e7; border-color: #e8c87a; }
+    .dday-over  { color: #7a1a1a; background: #fde8e8; border-color: #e89a9a; }
+
+    /* ── 모달 ── */
+    .modal-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.3);
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+    }
+    .modal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 28px;
+      width: 480px;
+      max-width: calc(100vw - 40px);
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+    .modal-title {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 20px;
+    }
+    .form-row { display: flex; flex-direction: column; gap: 4px; margin-bottom: 14px; }
+    .form-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
+    .select {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      font-size: 13px;
+      background: var(--surface);
+      color: var(--text);
+      outline: none;
+      appearance: none;
+    }
+    .select:focus { border-color: var(--accent); }
+    .textarea {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      font-size: 13px;
+      background: var(--surface);
+      color: var(--text);
+      outline: none;
+      resize: vertical;
+      font-family: inherit;
+    }
+    .textarea:focus { border-color: var(--accent); }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+
+    /* 숨김 처리 */
+    .project-card[hidden] { display: none; }
+  </style>
+</head>
+<body>
+  <div class="screen">
+
+    <nav class="topnav">
+      <a href="../index.html" class="topnav-back">← 목록</a>
+      <span class="topnav-title">관리자 UI</span>
+      <span class="topnav-tag">prototype</span>
+    </nav>
+
+    <div class="with-sidebar">
+      <aside class="sidebar">
+        <a href="#" class="sidebar-item active">과제 관리</a>
+      </aside>
+
+      <main class="content">
+
+        <!-- 상단 통계 -->
+        <div class="grid-4 mb-24">
+          <div class="card stat-block">
+            <div class="stat-value">18</div>
+            <div class="stat-label">전체 과제</div>
+          </div>
+          <div class="card stat-block">
+            <div class="stat-value">7</div>
+            <div class="stat-label">진행 중</div>
+            <div class="stat-delta up">▲ 2 이번 주 신규</div>
+          </div>
+          <div class="card stat-block">
+            <div class="stat-value">9</div>
+            <div class="stat-label">완료</div>
+          </div>
+          <div class="card stat-block">
+            <div class="stat-value">2</div>
+            <div class="stat-label">지연</div>
+            <div class="stat-delta down">기한 초과</div>
+          </div>
+        </div>
+
+        <!-- 필터 & 검색 -->
+        <div class="row mb-16" style="flex-wrap:wrap; gap:12px;">
+          <div class="filter-bar" id="filterBar">
+            <button class="filter-btn active" data-filter="all">전체</button>
+            <button class="filter-btn" data-filter="진행중">진행 중</button>
+            <button class="filter-btn" data-filter="검토중">검토 중</button>
+            <button class="filter-btn" data-filter="완료">완료</button>
+            <button class="filter-btn" data-filter="지연">지연</button>
+          </div>
+          <div class="row" style="margin-left:auto; gap:8px;">
+            <input class="input" id="searchInput" style="width:180px;" placeholder="과제명 검색..." />
+            <button class="btn btn-primary" onclick="openModal('addModal')">+ 과제 추가</button>
+          </div>
+        </div>
+
+        <!-- 과제 카드 그리드 -->
+        <div class="project-grid" id="projectGrid">
+
+          <div class="project-card" data-status="진행중" onclick="showToast('상세 페이지 (미구현)')">
+            <div class="project-card-top">
+              <div class="project-title">요구사항 분석 및 기능 정의서 작성</div>
+              <span class="badge badge-warn">진행중</span>
+            </div>
+            <div class="project-meta">
+              <span>📁 기획</span>
+              <span>📅 2026-06-10</span>
+            </div>
+            <div>
+              <div class="row" style="justify-content:space-between;">
+                <span class="text-sm text-sub">진행률</span>
+                <span class="text-sm font-bold">65%</span>
+              </div>
+              <div class="progress-track"><div class="progress-fill" style="width:65%"></div></div>
+            </div>
+            <div class="project-footer">
+              <div class="avatars">
+                <div class="avatar">김</div>
+                <div class="avatar">이</div>
+              </div>
+              <span class="dday dday-ok">D-13</span>
+            </div>
+          </div>
+
+          <div class="project-card" data-status="진행중" onclick="showToast('상세 페이지 (미구현)')">
+            <div class="project-card-top">
+              <div class="project-title">UI/UX 프로토타입 제작</div>
+              <span class="badge badge-warn">진행중</span>
+            </div>
+            <div class="project-meta">
+              <span>📁 디자인</span>
+              <span>📅 2026-06-20</span>
+            </div>
+            <div>
+              <div class="row" style="justify-content:space-between;">
+                <span class="text-sm text-sub">진행률</span>
+                <span class="text-sm font-bold">40%</span>
+              </div>
+              <div class="progress-track"><div class="progress-fill" style="width:40%"></div></div>
+            </div>
+            <div class="project-footer">
+              <div class="avatars">
+                <div class="avatar">박</div>
+              </div>
+              <span class="dday dday-ok">D-23</span>
+            </div>
+          </div>
+
+          <div class="project-card" data-status="검토중" onclick="showToast('상세 페이지 (미구현)')">
+            <div class="project-card-top">
+              <div class="project-title">데이터베이스 설계 검토</div>
+              <span class="badge badge-default">검토중</span>
+            </div>
+            <div class="project-meta">
+              <span>📁 개발</span>
+              <span>📅 2026-05-30</span>
+            </div>
+            <div>
+              <div class="row" style="justify-content:space-between;">
+                <span class="text-sm text-sub">진행률</span>
+                <span class="text-sm font-bold">90%</span>
+              </div>
+              <div class="progress-track"><div class="progress-fill" style="width:90%"></div></div>
+            </div>
+            <div class="project-footer">
+              <div class="avatars">
+                <div class="avatar">최</div>
+                <div class="avatar">정</div>
+              </div>
+              <span class="dday dday-warn">D-2</span>
+            </div>
+          </div>
+
+          <div class="project-card" data-status="지연" onclick="showToast('상세 페이지 (미구현)')">
+            <div class="project-card-top">
+              <div class="project-title">API 명세서 작성 및 배포</div>
+              <span class="badge badge-error">지연</span>
+            </div>
+            <div class="project-meta">
+              <span>📁 개발</span>
+              <span>📅 2026-05-20</span>
+            </div>
+            <div>
+              <div class="row" style="justify-content:space-between;">
+                <span class="text-sm text-sub">진행률</span>
+                <span class="text-sm font-bold">55%</span>
+              </div>
+              <div class="progress-track"><div class="progress-fill" style="width:55%"></div></div>
+            </div>
+            <div class="project-footer">
+              <div class="avatars">
+                <div class="avatar">윤</div>
+              </div>
+              <span class="dday dday-over">D+8</span>
+            </div>
+          </div>
+
+          <div class="project-card" data-status="완료" onclick="showToast('상세 페이지 (미구현)')">
+            <div class="project-card-top">
+              <div class="project-title">킥오프 미팅 및 일정 수립</div>
+              <span class="badge badge-active">완료</span>
+            </div>
+            <div class="project-meta">
+              <span>📁 기획</span>
+              <span>📅 2026-04-30</span>
+            </div>
+            <div>
+              <div class="row" style="justify-content:space-between;">
+                <span class="text-sm text-sub">진행률</span>
+                <span class="text-sm font-bold">100%</span>
+              </div>
+              <div class="progress-track"><div class="progress-fill" style="width:100%"></div></div>
+            </div>
+            <div class="project-footer">
+              <div class="avatars">
+                <div class="avatar">김</div>
+                <div class="avatar">이</div>
+                <div class="avatar">박</div>
+              </div>
+              <span class="dday dday-ok">완료</span>
+            </div>
+          </div>
+
+          <div class="project-card" data-status="완료" onclick="showToast('상세 페이지 (미구현)')">
+            <div class="project-card-top">
+              <div class="project-title">AS-IS 현황 분석 보고서</div>
+              <span class="badge badge-active">완료</span>
+            </div>
+            <div class="project-meta">
+              <span>📁 기획</span>
+              <span>📅 2026-05-10</span>
+            </div>
+            <div>
+              <div class="row" style="justify-content:space-between;">
+                <span class="text-sm text-sub">진행률</span>
+                <span class="text-sm font-bold">100%</span>
+              </div>
+              <div class="progress-track"><div class="progress-fill" style="width:100%"></div></div>
+            </div>
+            <div class="project-footer">
+              <div class="avatars">
+                <div class="avatar">최</div>
+              </div>
+              <span class="dday dday-ok">완료</span>
+            </div>
+          </div>
+
+          <div class="project-card" data-status="지연" onclick="showToast('상세 페이지 (미구현)')">
+            <div class="project-card-top">
+              <div class="project-title">보안 취약점 점검 및 조치</div>
+              <span class="badge badge-error">지연</span>
+            </div>
+            <div class="project-meta">
+              <span>📁 운영</span>
+              <span>📅 2026-05-15</span>
+            </div>
+            <div>
+              <div class="row" style="justify-content:space-between;">
+                <span class="text-sm text-sub">진행률</span>
+                <span class="text-sm font-bold">30%</span>
+              </div>
+              <div class="progress-track"><div class="progress-fill" style="width:30%"></div></div>
+            </div>
+            <div class="project-footer">
+              <div class="avatars">
+                <div class="avatar">정</div>
+                <div class="avatar">윤</div>
+              </div>
+              <span class="dday dday-over">D+13</span>
+            </div>
+          </div>
+
+          <div class="project-card" data-status="진행중" onclick="showToast('상세 페이지 (미구현)')">
+            <div class="project-card-top">
+              <div class="project-title">사용자 테스트 시나리오 작성</div>
+              <span class="badge badge-warn">진행중</span>
+            </div>
+            <div class="project-meta">
+              <span>📁 QA</span>
+              <span>📅 2026-07-01</span>
+            </div>
+            <div>
+              <div class="row" style="justify-content:space-between;">
+                <span class="text-sm text-sub">진행률</span>
+                <span class="text-sm font-bold">20%</span>
+              </div>
+              <div class="progress-track"><div class="progress-fill" style="width:20%"></div></div>
+            </div>
+            <div class="project-footer">
+              <div class="avatars">
+                <div class="avatar">이</div>
+              </div>
+              <span class="dday dday-ok">D-34</span>
+            </div>
+          </div>
+
+        </div>
+        <!-- /project-grid -->
+
+      </main>
+    </div>
+  </div>
+
+  <!-- 과제 추가 모달 -->
+  <div class="modal-backdrop" id="addModal">
+    <div class="modal" onclick="event.stopPropagation()">
+      <div class="modal-title">과제 추가</div>
+
+      <div class="form-row">
+        <label class="label">과제명 *</label>
+        <input class="input" placeholder="과제 이름을 입력하세요" />
+      </div>
+
+      <div class="form-row-2">
+        <div class="form-row" style="margin-bottom:0;">
+          <label class="label">카테고리</label>
+          <select class="select">
+            <option>기획</option>
+            <option>디자인</option>
+            <option>개발</option>
+            <option>QA</option>
+            <option>운영</option>
+          </select>
+        </div>
+        <div class="form-row" style="margin-bottom:0;">
+          <label class="label">상태</label>
+          <select class="select">
+            <option>진행중</option>
+            <option>검토중</option>
+            <option>완료</option>
+            <option>지연</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-row-2">
+        <div class="form-row" style="margin-bottom:0;">
+          <label class="label">담당자</label>
+          <input class="input" placeholder="이름" />
+        </div>
+        <div class="form-row" style="margin-bottom:0;">
+          <label class="label">마감일</label>
+          <input class="input" type="date" />
+        </div>
+      </div>
+
+      <div class="form-row">
+        <label class="label">메모</label>
+        <textarea class="textarea" rows="3" placeholder="추가 내용을 입력하세요"></textarea>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-outline" onclick="closeModal('addModal')">취소</button>
+        <button class="btn btn-primary" onclick="closeModal('addModal'); showToast('과제가 추가되었습니다.')">추가</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="../js/main.js"></script>
+  <script src="../js/projects.js"></script>
+</body>
+</html>
