@@ -36,6 +36,7 @@ const DEFAULT_PROJECTS = [
       items: [{id:11, name:'스마트 비전 센서', date:'2026-06-01', amount:5000000, files:[]}]
     }],
     consultingSubs: [],
+    budget: { directSupport: 15000000, printCost: 500000, meetingCost: 300000, indirectCost: 200000 },
   }
 ];
 
@@ -143,6 +144,24 @@ function buildKpiCell(p) {
   }).join('');
 }
 
+/* 예산 셀 */
+function buildBudgetCell(p) {
+  const b = p.budget || {};
+  const direct = b.directSupport || 0;
+  const op     = (b.printCost || 0) + (b.meetingCost || 0);
+  const ind    = b.indirectCost || 0;
+  const total  = direct + op + ind;
+  if (total === 0) return '<span class="text-sub" style="font-size:12px;">—</span>';
+  const fmt = v => v > 0 ? v.toLocaleString() + '원' : null;
+  const lines = [
+    `<div style="font-size:12px;font-weight:700;">합계 ${fmt(total)}</div>`,
+    direct > 0 ? `<div style="font-size:11px;color:var(--text-sub);">직접지원비 ${fmt(direct)}</div>` : '',
+    op     > 0 ? `<div style="font-size:11px;color:var(--text-sub);">사업운영비 ${fmt(op)}</div>` : '',
+    ind    > 0 ? `<div style="font-size:11px;color:var(--text-sub);">간접비 ${fmt(ind)}</div>` : '',
+  ].filter(Boolean).join('');
+  return lines;
+}
+
 /* 세부과제 셀: 유형·이름·품목·컨설턴트 */
 function buildSubCell(p) {
   const all = [
@@ -175,10 +194,11 @@ function renderTable() {
       <th style="width:100px;">지원구분</th>
       <th style="min-width:160px;">KPI</th>
       <th style="min-width:200px;">세부과제</th>
+      <th style="min-width:140px;">예산</th>
       <th style="width:90px;"></th>
     </tr></thead>`;
   if (!projects.length) {
-    el.innerHTML = head + `<tbody><tr><td colspan="8" style="text-align:center;padding:24px;" class="text-sub text-sm">항목이 없습니다</td></tr></tbody></table>`;
+    el.innerHTML = head + `<tbody><tr><td colspan="9" style="text-align:center;padding:24px;" class="text-sub text-sm">항목이 없습니다</td></tr></tbody></table>`;
     return;
   }
   const rows = projects.map((p, i) => {
@@ -196,6 +216,7 @@ function renderTable() {
       <td style="padding-top:12px;">${subBadge}</td>
       <td style="padding-top:10px;">${buildKpiCell(p)}</td>
       <td style="padding-top:10px;">${buildSubCell(p)}</td>
+      <td style="padding-top:10px;">${buildBudgetCell(p)}</td>
       <td style="padding-top:10px;"><div class="row" style="gap:4px;">
         <button class="btn btn-outline text-sm" onclick="openProjectModal(${p.id})">수정</button>
         <button class="btn btn-outline text-sm" onclick="deleteProject(${p.id})">삭제</button>
@@ -234,6 +255,7 @@ function openProjectModal(id = null) {
       id: null, name: '', supportType: '', subTypes: [], hasConsulting: false,
       problem: '', summary: '', goal: '', kpis: [],
       directSubs: [], consultingSubs: [],
+      budget: { directSupport: 0, printCost: 0, meetingCost: 0, indirectCost: 0 },
     };
     document.getElementById('pmTitle').textContent = '과제 등록';
   }
@@ -249,7 +271,8 @@ function closeProjectModal() {
 }
 
 function renderProjectForm() {
-  const cp = currentProject;
+  const cp     = currentProject;
+  const budget = cp.budget || { directSupport: 0, printCost: 0, meetingCost: 0, indirectCost: 0 };
   const supportOpts = ['생산혁신','기술혁신','일터혁신','시장혁신'].map(t =>
     `<option${cp.supportType === t ? ' selected' : ''}>${t}</option>`).join('');
   const subTypePills = ['p','q1','q2','c','d','m1','m2','ma1','ma2'].map(t =>
@@ -312,6 +335,54 @@ function renderProjectForm() {
     </div>
 
     <div class="row mb-8">
+      <span class="section-title" style="margin-bottom:0;">예산</span>
+    </div>
+    <table class="table inline-table" style="margin-top:4px;margin-bottom:20px;table-layout:fixed;width:100%;">
+      <thead>
+        <tr>
+          <th rowspan="2" style="vertical-align:middle;text-align:center;width:22%;">직접지원비</th>
+          <th colspan="2" style="text-align:center;border-bottom:1px solid var(--border);">사업운영비</th>
+          <th style="text-align:center;width:20%;">간접비</th>
+          <th rowspan="2" style="vertical-align:middle;text-align:center;width:18%;">합계</th>
+        </tr>
+        <tr>
+          <th style="text-align:center;width:18%;font-weight:500;color:var(--text-sub);">인쇄비</th>
+          <th style="text-align:center;width:18%;font-weight:500;color:var(--text-sub);">회의비</th>
+          <th style="text-align:center;font-weight:500;color:var(--text-sub);">기술임치</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td style="padding:6px 8px;">
+            <input class="input" type="number" id="bdDirect" min="0" step="1"
+                   value="${budget.directSupport || ''}" placeholder="0"
+                   style="font-size:12px;padding:6px 8px;text-align:right;"
+                   oninput="updateBudgetTotal()">
+          </td>
+          <td style="padding:6px 8px;">
+            <input class="input" type="number" id="bdPrint" min="0" step="1"
+                   value="${budget.printCost || ''}" placeholder="0"
+                   style="font-size:12px;padding:6px 8px;text-align:right;"
+                   oninput="updateBudgetTotal()">
+          </td>
+          <td style="padding:6px 8px;">
+            <input class="input" type="number" id="bdMeeting" min="0" step="1"
+                   value="${budget.meetingCost || ''}" placeholder="0"
+                   style="font-size:12px;padding:6px 8px;text-align:right;"
+                   oninput="updateBudgetTotal()">
+          </td>
+          <td style="padding:6px 8px;">
+            <input class="input" type="number" id="bdIndirect" min="0" step="1"
+                   value="${budget.indirectCost || ''}" placeholder="0"
+                   style="font-size:12px;padding:6px 8px;text-align:right;"
+                   oninput="updateBudgetTotal()">
+          </td>
+          <td style="padding:6px 10px;text-align:right;font-weight:700;font-size:13px;" id="bdGrandTotal">—</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="row mb-8">
       <span class="section-title" style="margin-bottom:0;">
         KPI <span class="text-sub" style="font-weight:400;">(대표과제)</span>
       </span>
@@ -326,6 +397,7 @@ function renderProjectForm() {
 
   renderKpiTable('project');
   renderSubTable();
+  updateBudgetTotal();
   validateProjectForm();
 }
 
@@ -338,6 +410,23 @@ function onPmDirectClick(e) {
   e.preventDefault();
   document.getElementById('pmChkDirect').checked = true;
   showToast('직접지원은 항상 포함됩니다.');
+}
+
+// ── 예산 합계 자동 계산 ──
+function updateBudgetTotal() {
+  const direct   = parseFloat(document.getElementById('bdDirect')?.value)   || 0;
+  const print    = parseFloat(document.getElementById('bdPrint')?.value)    || 0;
+  const meeting  = parseFloat(document.getElementById('bdMeeting')?.value)  || 0;
+  const indirect = parseFloat(document.getElementById('bdIndirect')?.value) || 0;
+
+  const grand = direct + print + meeting + indirect;
+  const fmt   = v => v > 0 ? v.toLocaleString() + '원' : '—';
+
+  const grandEl = document.getElementById('bdGrandTotal');
+  if (grandEl) {
+    grandEl.textContent = fmt(grand);
+    grandEl.style.color = grand > 0 ? 'var(--text)' : 'var(--text-sub)';
+  }
 }
 
 // ── 과제 모달 유효성 검사 ──
@@ -466,6 +555,12 @@ function saveProject() {
   cp.goal          = document.getElementById('pmGoal')?.value || '';
   cp.subTypes      = [...document.querySelectorAll('[name="pmSubType"]:checked')].map(e => e.value);
   cp.kpis          = collectInlineKpis('project');
+  cp.budget        = {
+    directSupport: parseFloat(document.getElementById('bdDirect')?.value)   || 0,
+    printCost:     parseFloat(document.getElementById('bdPrint')?.value)    || 0,
+    meetingCost:   parseFloat(document.getElementById('bdMeeting')?.value)  || 0,
+    indirectCost:  parseFloat(document.getElementById('bdIndirect')?.value) || 0,
+  };
 
   // 주 KPI 정규화
   const hasProjectMain = cp.kpis.some(k => k.isMain);
