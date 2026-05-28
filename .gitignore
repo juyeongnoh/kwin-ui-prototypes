@@ -1,1 +1,5 @@
-.claude
+CLAUDE.md
+.claude/
+.DS_Store
+*.log
+node_modules/
