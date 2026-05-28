@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>참여기업 상세 | 관리자 UI</title>
+  <link rel="stylesheet" href="../css/style.css" />
+  <style>
+    /* ── cb-pill ── */
+    .cb-pill {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 5px 12px; border: 1px solid var(--border);
+      border-radius: 20px; background: var(--surface);
+      font-size: 13px; cursor: pointer; user-select: none;
+      transition: background .12s, border-color .12s, color .12s;
+    }
+    .cb-pill input { display: none; }
+    .cb-pill:has(input:checked) { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .cb-pill.disabled { opacity: .5; cursor: not-allowed; }
+    .cb-pill.disabled:has(input:checked) { background: #888; border-color: #888; color: #fff; }
+
+    /* ── modal ── */
+    .modal-wrap {
+      position: fixed; inset: 0; z-index: 200;
+      background: rgba(0,0,0,.35);
+      display: none; align-items: center; justify-content: center;
+      padding: 20px;
+    }
+    .modal-wrap.open { display: flex; }
+    .modal-box {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 6px; display: flex; flex-direction: column;
+      max-width: calc(100vw - 40px); max-height: calc(100vh - 40px);
+      overflow: hidden;
+    }
+    .modal-head {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 20px; border-bottom: 1px solid var(--border);
+      flex-shrink: 0; gap: 12px;
+    }
+    .modal-title { font-size: 15px; font-weight: 600; }
+    .modal-body  { flex: 1; overflow-y: auto; padding: 20px; }
+    .modal-foot  {
+      display: flex; justify-content: flex-end; gap: 8px;
+      padding: 12px 20px; border-top: 1px solid var(--border); flex-shrink: 0;
+    }
+
+    /* ── KPI row ── */
+    .kpi-item {
+      display: grid;
+      grid-template-columns: 90px 1fr 110px 110px 90px 52px;
+      gap: 8px; align-items: center;
+      padding: 10px 12px; margin-bottom: 8px;
+      background: var(--accent-bg); border: 1px solid var(--border);
+      border-radius: var(--radius);
+    }
+    .kpi-rate {
+      font-size: 12px; font-weight: 700; text-align: center;
+      padding: 4px 6px; border-radius: var(--radius);
+      background: var(--surface); border: 1px solid var(--border);
+      white-space: nowrap; line-height: 1.4;
+    }
+    .kpi-rate.positive { color: #2a6a2a; border-color: #9acc9a; background: #e8f4e8; }
+    .kpi-rate.negative { color: #7a1a1a; border-color: #e89a9a; background: #fde8e8; }
+    .main-kpi-label {
+      display: flex; align-items: center; gap: 4px;
+      font-size: 11px; color: var(--text-sub); cursor: pointer; white-space: nowrap;
+    }
+    .main-kpi-label:has(input:checked) { color: #2a5e9e; font-weight: 700; }
+
+    /* ── item card ── */
+    .item-card {
+      border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 14px; margin-bottom: 10px; background: var(--surface);
+    }
+    .item-card-head {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .file-list { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+    .file-item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 5px 10px; background: var(--accent-bg); border-radius: var(--radius);
+      font-size: 12px;
+    }
+    .file-item button {
+      background: none; border: none; cursor: pointer; color: var(--text-sub);
+      font-size: 12px; padding: 0;
+    }
+
+    /* ── inner section (모달 내부 구분 영역) ── */
+    .inner-section {
+      border: 1px dashed var(--border); border-radius: var(--radius);
+      padding: 14px; margin-top: 16px;
+    }
+    .inner-head {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .inner-title {
+      font-size: 11px; font-weight: 700; color: var(--text-sub);
+      text-transform: uppercase; letter-spacing: .6px;
+    }
+
+    /* ── 세부과제 테이블 클릭 강조 ── */
+    .sub-table tr[data-type] { cursor: pointer; }
+    .sub-table tr[data-type]:hover td { background: #eef2ff; }
+
+    /* ── 기업 정보 그리드 ── */
+    .company-info { display: grid; grid-template-columns: repeat(4,1fr); gap: 16px; }
+    .company-info .info-label { font-size: 11px; color: var(--text-sub); margin-bottom: 3px; font-weight: 600; text-transform: uppercase; letter-spacing:.4px; }
+    .company-info .info-val   { font-size: 14px; }
+
+    /* ── 섹션 헤드 ── */
+    .section-head { display: flex; align-items: center; margin-bottom: 16px; }
+
+    /* ── 빈 상태 ── */
+    .kpi-empty { display: none; }
+    .kpi-empty.show { display: flex; }
+  </style>
+</head>
+<body>
+<div class="screen">
+
+  <nav class="topnav">
+    <a href="../index.html" class="topnav-back">← 목록</a>
+    <span class="topnav-title">관리자 UI</span>
+    <span class="topnav-tag">prototype</span>
+  </nav>
+
+  <div class="with-sidebar">
+    <aside class="sidebar">
+      <a href="#" class="sidebar-item active">과제 관리</a>
+    </aside>
+
+    <main class="content">
+
+      <!-- 참여기업 정보 -->
+      <div class="card mb-16">
+        <span class="section-title">참여기업 정보</span>
+        <div class="company-info">
+          <div><div class="info-label">기업명</div><div class="info-val font-bold">(주)혁신테크</div></div>
+          <div><div class="info-label">업종</div><div class="info-val">제조업 (자동차부품)</div></div>
+          <div><div class="info-label">사업자번호</div><div class="info-val">123-45-67890</div></div>
+          <div><div class="info-label">담당자</div><div class="info-val">김담당 · 010-1234-5678</div></div>
+        </div>
+      </div>
+
+      <!-- 과제 섹션 -->
+      <div class="card">
+        <div class="section-head">
+          <span class="section-title" style="margin-bottom:0;">과제</span>
+          <button class="btn btn-primary" style="margin-left:auto;" onclick="openProjectModal()">+ 추가</button>
+        </div>
+        <div id="projectTable">
+          <div class="placeholder" style="height:60px;">과제를 추가하세요</div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     과제 등록/수정 모달  (z-index: 200)
+     ══════════════════════════════════════ -->
+<div class="modal-wrap" id="projectModal">
+  <div class="modal-box" style="width:800px;">
+    <div class="modal-head">
+      <span class="modal-title" id="pmTitle">과제 등록</span>
+      <button class="btn btn-outline text-sm" onclick="closeProjectModal()">✕ 닫기</button>
+    </div>
+    <div class="modal-body" id="pmBody"></div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" onclick="closeProjectModal()">취소</button>
+      <button class="btn btn-primary" onclick="saveProject()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     세부과제 모달  (z-index: 300)
+     ══════════════════════════════════════ -->
+<div class="modal-wrap" id="subModal" style="z-index:300; background:rgba(0,0,0,.5);">
+  <div class="modal-box" style="width:660px;">
+    <div class="modal-head">
+      <span class="modal-title" id="smTitle">세부과제 입력</span>
+      <button class="btn btn-outline text-sm" onclick="closeSubModal()">✕ 닫기</button>
+    </div>
+    <div class="modal-body" id="smBody"></div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" onclick="closeSubModal()">취소</button>
+      <button class="btn btn-primary" onclick="saveSubModal()">확인</button>
+    </div>
+  </div>
+</div>
+
+<script src="../js/main.js"></script>
+<script src="../js/company-detail.js"></script>
+</body>
+</html>
