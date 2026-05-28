@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>샘플 화면</title>
+  <link rel="stylesheet" href="../css/style.css" />
+</head>
+<body>
+  <div class="screen">
+
+    <!-- 상단 네비게이션 -->
+    <nav class="topnav">
+      <a href="../index.html" class="topnav-back">← 목록</a>
+      <span class="topnav-title">샘플 화면</span>
+      <span class="topnav-tag">prototype</span>
+    </nav>
+
+    <div class="with-sidebar">
+
+      <!-- 사이드바 -->
+      <aside class="sidebar">
+        <a href="#" class="sidebar-item active">대시보드</a>
+        <a href="#" class="sidebar-item">목록</a>
+        <a href="#" class="sidebar-item">설정</a>
+      </aside>
+
+      <!-- 메인 콘텐츠 -->
+      <main class="content">
+
+        <!-- 통계 카드 -->
+        <div class="grid-4 mb-24">
+          <div class="card stat-block">
+            <div class="stat-value">1,284</div>
+            <div class="stat-label">총 건수</div>
+            <div class="stat-delta up">▲ 12% 전월 대비</div>
+          </div>
+          <div class="card stat-block">
+            <div class="stat-value">342</div>
+            <div class="stat-label">처리 중</div>
+            <div class="stat-delta down">▼ 3% 전월 대비</div>
+          </div>
+          <div class="card stat-block">
+            <div class="stat-value">87%</div>
+            <div class="stat-label">완료율</div>
+            <div class="stat-delta up">▲ 2%p</div>
+          </div>
+          <div class="card stat-block">
+            <div class="stat-value">24</div>
+            <div class="stat-label">오류 건수</div>
+            <div class="stat-delta down">▼ 5</div>
+          </div>
+        </div>
+
+        <!-- 차트 -->
+        <div class="grid-2 mb-24">
+          <div class="card">
+            <div class="section-title">월별 현황</div>
+            <div class="chart-area" style="height: 180px;">
+              <canvas id="barChart" style="width:100%;height:100%;display:block;"></canvas>
+            </div>
+          </div>
+          <div class="card">
+            <div class="section-title">추이</div>
+            <div class="chart-area" style="height: 180px;">
+              <canvas id="lineChart" style="width:100%;height:100%;display:block;"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- 테이블 -->
+        <div class="card mb-24">
+          <div class="row mb-16">
+            <span class="section-title" style="margin-bottom:0;">목록</span>
+            <div class="row" style="margin-left:auto; gap:8px;">
+              <input class="input" style="width:180px;" placeholder="검색..." />
+              <button class="btn btn-primary" onclick="showToast('새 항목이 추가되었습니다.')">+ 추가</button>
+            </div>
+          </div>
+          <table class="table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>이름</th>
+                <th>상태</th>
+                <th>날짜</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="text-sub text-sm">001</td>
+                <td>항목 A</td>
+                <td><span class="badge badge-active">완료</span></td>
+                <td class="text-sub text-sm">2026-05-01</td>
+                <td><button class="btn btn-outline text-sm" onclick="showToast('상세 페이지 (미구현)')">보기</button></td>
+              </tr>
+              <tr>
+                <td class="text-sub text-sm">002</td>
+                <td>항목 B</td>
+                <td><span class="badge badge-warn">처리 중</span></td>
+                <td class="text-sub text-sm">2026-05-03</td>
+                <td><button class="btn btn-outline text-sm" onclick="showToast('상세 페이지 (미구현)')">보기</button></td>
+              </tr>
+              <tr>
+                <td class="text-sub text-sm">003</td>
+                <td>항목 C</td>
+                <td><span class="badge badge-error">오류</span></td>
+                <td class="text-sub text-sm">2026-05-07</td>
+                <td><button class="btn btn-outline text-sm" onclick="showToast('상세 페이지 (미구현)')">보기</button></td>
+              </tr>
+              <tr>
+                <td class="text-sub text-sm">004</td>
+                <td>항목 D</td>
+                <td><span class="badge badge-default">대기</span></td>
+                <td class="text-sub text-sm">2026-05-10</td>
+                <td><button class="btn btn-outline text-sm" onclick="showToast('상세 페이지 (미구현)')">보기</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+  <script src="../js/main.js"></script>
+  <script>
+    // 차트 초기화 (canvas DPR 처리 포함)
+    function initCanvas(id) {
+      const canvas = document.getElementById(id);
+      const area = canvas.parentElement;
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width  = area.clientWidth  * dpr;
+      canvas.height = area.clientHeight * dpr;
+      canvas.getContext('2d').scale(dpr, dpr);
+      return canvas;
+    }
+
+    const bar = initCanvas('barChart');
+    drawBarChart(bar, [
+      { label: '1월', value: 820 },
+      { label: '2월', value: 932 },
+      { label: '3월', value: 1100 },
+      { label: '4월', value: 1040 },
+      { label: '5월', value: 1284 },
+    ]);
+
+    const line = initCanvas('lineChart');
+    drawLineChart(line, [
+      { label: '1월', value: 78 },
+      { label: '2월', value: 82 },
+      { label: '3월', value: 80 },
+      { label: '4월', value: 85 },
+      { label: '5월', value: 87 },
+    ], { min: 60, max: 100 });
+  </script>
+</body>
+</html>
