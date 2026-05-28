@@ -301,3 +301,4 @@
 .text-sub { color: var(--text-sub); }
 .text-sm { font-size: 12px; }
 .font-bold { font-weight: 700; }
+.hidden { display: none !important; }
