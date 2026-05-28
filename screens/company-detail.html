@@ -40,66 +40,42 @@
     }
     .modal-title { font-size: 15px; font-weight: 600; }
     .modal-body  { flex: 1; overflow-y: auto; padding: 20px; }
-    .modal-foot  {
-      display: flex; justify-content: flex-end; gap: 8px;
-      padding: 12px 20px; border-top: 1px solid var(--border); flex-shrink: 0;
+
+    /* ── 모달 하단 버튼: 전체 너비 ── */
+    .modal-foot {
+      display: flex;
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
+      overflow: hidden;
+      border-bottom-left-radius: 6px;
+      border-bottom-right-radius: 6px;
+    }
+    .modal-foot .btn {
+      flex: 1;
+      border-radius: 0;
+      padding: 14px;
+      border: none;
+      font-size: 14px;
+      justify-content: center;
+    }
+    .modal-foot .btn + .btn {
+      border-left: 1px solid var(--border);
+    }
+    .modal-foot .btn:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
     }
 
-    /* ── KPI row ── */
-    .kpi-item {
-      display: grid;
-      grid-template-columns: 90px 1fr 110px 110px 90px 52px;
-      gap: 8px; align-items: center;
-      padding: 10px 12px; margin-bottom: 8px;
-      background: var(--accent-bg); border: 1px solid var(--border);
-      border-radius: var(--radius);
-    }
-    .kpi-rate {
-      font-size: 12px; font-weight: 700; text-align: center;
-      padding: 4px 6px; border-radius: var(--radius);
-      background: var(--surface); border: 1px solid var(--border);
-      white-space: nowrap; line-height: 1.4;
-    }
-    .kpi-rate.positive { color: #2a6a2a; border-color: #9acc9a; background: #e8f4e8; }
-    .kpi-rate.negative { color: #7a1a1a; border-color: #e89a9a; background: #fde8e8; }
-    .main-kpi-label {
-      display: flex; align-items: center; gap: 4px;
-      font-size: 11px; color: var(--text-sub); cursor: pointer; white-space: nowrap;
-    }
-    .main-kpi-label:has(input:checked) { color: #2a5e9e; font-weight: 700; }
-
-    /* ── item card ── */
-    .item-card {
-      border: 1px solid var(--border); border-radius: var(--radius);
-      padding: 14px; margin-bottom: 10px; background: var(--surface);
-    }
-    .item-card-head {
-      display: flex; align-items: center; justify-content: space-between;
-      margin-bottom: 12px;
-    }
-    .file-list { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+    /* ── file-item ── */
+    .file-list { display: flex; flex-direction: column; gap: 3px; margin-top: 4px; }
     .file-item {
       display: flex; align-items: center; justify-content: space-between;
-      padding: 5px 10px; background: var(--accent-bg); border-radius: var(--radius);
-      font-size: 12px;
+      padding: 4px 8px; background: var(--accent-bg); border-radius: var(--radius);
+      font-size: 11px;
     }
     .file-item button {
       background: none; border: none; cursor: pointer; color: var(--text-sub);
-      font-size: 12px; padding: 0;
-    }
-
-    /* ── inner section (모달 내부 구분 영역) ── */
-    .inner-section {
-      border: 1px dashed var(--border); border-radius: var(--radius);
-      padding: 14px; margin-top: 16px;
-    }
-    .inner-head {
-      display: flex; align-items: center; justify-content: space-between;
-      margin-bottom: 12px;
-    }
-    .inner-title {
-      font-size: 11px; font-weight: 700; color: var(--text-sub);
-      text-transform: uppercase; letter-spacing: .6px;
+      font-size: 11px; padding: 0; line-height: 1;
     }
 
     /* ── 세부과제 테이블 클릭 강조 ── */
@@ -114,9 +90,18 @@
     /* ── 섹션 헤드 ── */
     .section-head { display: flex; align-items: center; margin-bottom: 16px; }
 
-    /* ── 빈 상태 ── */
-    .kpi-empty { display: none; }
-    .kpi-empty.show { display: flex; }
+    /* ── 인라인 테이블 행 입력 ── */
+    .inline-table td { vertical-align: middle; }
+    .inline-table input.input, .inline-table select.select {
+      font-size: 12px; padding: 5px 8px;
+    }
+    .inline-table select.select { padding-right: 24px; }
+    .inline-table .btn { padding: 4px 8px; font-size: 11px; }
+
+    /* 날짜 미리보기 */
+    .date-preview-item {
+      font-size: 11px; color: var(--text-sub); margin-top: 2px; line-height: 1.5;
+    }
   </style>
 </head>
 <body>
@@ -126,6 +111,8 @@
     <a href="../index.html" class="topnav-back">← 목록</a>
     <span class="topnav-title">관리자 UI</span>
     <span class="topnav-tag">prototype</span>
+    <button class="btn btn-outline text-sm" style="margin-left:auto; font-size:12px;"
+            onclick="resetData()">↺ 데이터 초기화</button>
   </nav>
 
   <div class="with-sidebar">
@@ -133,7 +120,7 @@
       <a href="#" class="sidebar-item active">과제 관리</a>
     </aside>
 
-    <main class="content">
+    <main class="content" style="max-width:none; margin:0;">
 
       <!-- 참여기업 정보 -->
       <div class="card mb-16">
@@ -152,9 +139,7 @@
           <span class="section-title" style="margin-bottom:0;">과제</span>
           <button class="btn btn-primary" style="margin-left:auto;" onclick="openProjectModal()">+ 추가</button>
         </div>
-        <div id="projectTable">
-          <div class="placeholder" style="height:60px;">과제를 추가하세요</div>
-        </div>
+        <div id="projectTable"></div>
       </div>
 
     </main>
@@ -165,7 +150,7 @@
      과제 등록/수정 모달  (z-index: 200)
      ══════════════════════════════════════ -->
 <div class="modal-wrap" id="projectModal">
-  <div class="modal-box" style="width:800px;">
+  <div class="modal-box" style="width:820px;">
     <div class="modal-head">
       <span class="modal-title" id="pmTitle">과제 등록</span>
       <button class="btn btn-outline text-sm" onclick="closeProjectModal()">✕ 닫기</button>
@@ -173,7 +158,7 @@
     <div class="modal-body" id="pmBody"></div>
     <div class="modal-foot">
       <button class="btn btn-outline" onclick="closeProjectModal()">취소</button>
-      <button class="btn btn-primary" onclick="saveProject()">저장</button>
+      <button class="btn btn-primary" id="pmSaveBtn" onclick="saveProject()" disabled>저장</button>
     </div>
   </div>
 </div>
@@ -182,15 +167,32 @@
      세부과제 모달  (z-index: 300)
      ══════════════════════════════════════ -->
 <div class="modal-wrap" id="subModal" style="z-index:300; background:rgba(0,0,0,.5);">
-  <div class="modal-box" style="width:660px;">
+  <div class="modal-box" style="width:720px;">
     <div class="modal-head">
-      <span class="modal-title" id="smTitle">세부과제 입력</span>
+      <span class="modal-title" id="smTitle">세부과제</span>
       <button class="btn btn-outline text-sm" onclick="closeSubModal()">✕ 닫기</button>
     </div>
     <div class="modal-body" id="smBody"></div>
     <div class="modal-foot">
       <button class="btn btn-outline" onclick="closeSubModal()">취소</button>
-      <button class="btn btn-primary" onclick="saveSubModal()">확인</button>
+      <button class="btn btn-primary" id="smSaveBtn" onclick="saveSubModal()" disabled>저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     예정 컨설팅 일자 모달  (z-index: 400)
+     ══════════════════════════════════════ -->
+<div class="modal-wrap" id="dateModal" style="z-index:400; background:rgba(0,0,0,.6);">
+  <div class="modal-box" style="width:440px;">
+    <div class="modal-head">
+      <span class="modal-title" id="dmTitle">예정 컨설팅 일자</span>
+      <button class="btn btn-outline text-sm" onclick="closeDateModal()">✕ 닫기</button>
+    </div>
+    <div class="modal-body" id="dmBody"></div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" onclick="closeDateModal()">취소</button>
+      <button class="btn btn-primary" onclick="saveDateModal()">저장</button>
     </div>
   </div>
 </div>
