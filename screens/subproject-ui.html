@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>과제 관리</title>
+  <link rel="stylesheet" href="../css/style.css" />
+  <style>
+    .cb-pill {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 5px 12px; border: 1px solid var(--border);
+      border-radius: 20px; background: var(--surface);
+      font-size: 13px; cursor: pointer; user-select: none;
+      transition: background .12s, border-color .12s, color .12s;
+    }
+    .cb-pill input { display: none; }
+    .cb-pill:has(input:checked) { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .cb-pill.disabled { opacity: .5; cursor: not-allowed; }
+    .cb-pill.disabled:has(input:checked) { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+    .modal-wrap {
+      position: fixed; inset: 0; z-index: 200;
+      background: rgba(0,0,0,.35);
+      display: none; align-items: center; justify-content: center; padding: 20px;
+    }
+    .modal-wrap.open { display: flex; }
+    .modal-box {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 6px; display: flex; flex-direction: column;
+      max-width: calc(100vw - 40px); max-height: calc(100vh - 40px); overflow: hidden;
+    }
+    .modal-head {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 20px; border-bottom: 1px solid var(--border); flex-shrink: 0; gap: 12px;
+    }
+    .modal-title { font-size: 15px; font-weight: 600; }
+    .modal-body  { flex: 1; overflow-y: auto; padding: 20px; }
+    .modal-foot {
+      display: flex; border-top: 1px solid var(--border);
+      flex-shrink: 0; overflow: hidden;
+      border-bottom-left-radius: 6px; border-bottom-right-radius: 6px;
+    }
+    .modal-foot .btn { flex: 1; border-radius: 0; padding: 14px; border: none; font-size: 14px; justify-content: center; }
+    .modal-foot .btn + .btn { border-left: 1px solid var(--border); }
+    .modal-foot .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    .file-list { display: flex; flex-direction: column; gap: 3px; margin-top: 4px; }
+    .file-item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 4px 8px; background: var(--accent-bg); border-radius: var(--radius); font-size: 11px;
+    }
+    .file-item button { background: none; border: none; cursor: pointer; color: var(--text-sub); font-size: 11px; padding: 0; }
+
+    .inline-table td { vertical-align: middle; }
+    .inline-table input.input, .inline-table select.select { font-size: 12px; padding: 5px 8px; }
+    .inline-table select.select { padding-right: 24px; }
+    .inline-table .btn { padding: 4px 8px; font-size: 11px; }
+
+    .date-preview-item { font-size: 11px; color: var(--text-sub); margin-top: 2px; line-height: 1.5; }
+
+    .type-radio-group {
+      display: flex; gap: 0; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; align-self: start;
+    }
+    .type-radio-group label {
+      padding: 8px 20px; cursor: pointer; font-size: 13px; font-weight: 500;
+      color: var(--text-sub); transition: background .1s, color .1s; user-select: none;
+    }
+    .type-radio-group label + label { border-left: 1px solid var(--border); }
+    .type-radio-group input[type="radio"] { display: none; }
+    .type-radio-group input[type="radio"]:checked + span {
+      /* handled via label styling below */
+    }
+    .type-radio-group label:has(input:checked) { background: var(--accent); color: #fff; font-weight: 600; }
+
+    .section-head { display: flex; align-items: center; margin-bottom: 16px; }
+
+    .sp-table tr[data-spid] { cursor: pointer; }
+    .sp-table tr[data-spid]:hover td { background: #eef2ff; }
+
+    /* 주 KPI toggle */
+    .main-kpi-toggle {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 5px 12px; border: 1px solid var(--border);
+      border-radius: 20px; background: var(--surface);
+      font-size: 13px; cursor: pointer; user-select: none;
+      transition: background .12s, border-color .12s, color .12s;
+    }
+    .main-kpi-toggle input { display: none; }
+    .main-kpi-toggle:has(input:checked) { background: #e09000; border-color: #e09000; color: #fff; }
+
+    /* KPI 콤보박스 */
+    .kpi-combo { position: relative; flex: 1; min-width: 200px; }
+    .kpi-combo-trigger {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 7px 10px; border: 1px solid var(--border);
+      border-radius: 4px; background: var(--surface);
+      cursor: pointer; font-size: 12px; min-height: 35px; gap: 6px;
+      transition: border-color .12s; user-select: none;
+    }
+    .kpi-combo-trigger:hover,
+    .kpi-combo-trigger.open { border-color: var(--accent); }
+    .kpi-combo-trigger .placeholder { color: var(--text-sub); }
+
+    /* 드롭다운 패널 — JS로 position:fixed 세팅 */
+    .kpi-combo-panel {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 6px; box-shadow: 0 6px 24px rgba(0,0,0,.15);
+      z-index: 9999; overflow: hidden;
+    }
+    .kpi-combo-list { max-height: 200px; overflow-y: auto; }
+    .kpi-combo-item {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 12px; font-size: 12px; cursor: pointer;
+      transition: background .08s;
+    }
+    .kpi-combo-item:hover { background: var(--accent-bg); }
+    .kpi-combo-item.selected { background: var(--accent); color: #fff; }
+    .kpi-combo-item.selected .badge { background: rgba(255,255,255,.2); border-color: rgba(255,255,255,.3); color: #fff; }
+    .kpi-combo-empty { padding: 12px 14px; color: var(--text-sub); font-size: 12px; text-align: center; }
+
+    .kpi-combo-add-trigger {
+      display: flex; align-items: center; gap: 6px;
+      padding: 10px 12px; font-size: 12px; font-weight: 600;
+      color: #3730a3; cursor: pointer;
+      border-top: 1px solid var(--border); background: #f0f4ff;
+      transition: background .1s;
+    }
+    .kpi-combo-add-trigger:hover { background: #e0e8ff; }
+
+    .kpi-type-btn {
+      flex: 1; padding: 8px 0; border: 1px solid var(--border);
+      border-radius: 4px; background: var(--surface); cursor: pointer;
+      font-size: 12px; font-weight: 600; text-align: center;
+      transition: all .12s; color: var(--text-sub);
+    }
+    .kpi-type-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .kpi-type-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  </style>
+</head>
+<body>
+<div class="screen">
+
+  <nav class="topnav">
+    <a href="../index.html" class="topnav-back">← 목록</a>
+    <span class="topnav-title">과제 관리</span>
+    <span class="topnav-tag">prototype</span>
+    <button class="btn btn-outline text-sm" style="margin-left:auto;font-size:12px;"
+            onclick="resetData()">↺ 데이터 초기화</button>
+  </nav>
+
+  <div class="with-sidebar">
+    <aside class="sidebar">
+      <a href="#" class="sidebar-item active">과제 관리</a>
+    </aside>
+
+    <main class="content" style="max-width:none; margin:0;">
+      <div class="card">
+        <div class="section-head">
+          <span class="section-title" style="margin-bottom:0;">과제</span>
+          <button class="btn btn-primary" style="margin-left:auto;" onclick="openProjectModal()">+ 추가</button>
+        </div>
+        <div id="projectTable"></div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- 과제 모달 -->
+<div class="modal-wrap" id="projectModal">
+  <div class="modal-box" style="width:860px;">
+    <div class="modal-head">
+      <span class="modal-title" id="pmTitle">과제 등록</span>
+      <button class="btn btn-outline text-sm" onclick="closeProjectModal()">✕ 닫기</button>
+    </div>
+    <div class="modal-body" id="pmBody"></div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" onclick="closeProjectModal()">취소</button>
+      <button class="btn btn-primary" id="pmSaveBtn" onclick="saveProject()" disabled>저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- 세부과제 모달 -->
+<div class="modal-wrap" id="spModal" style="z-index:300; background:rgba(0,0,0,.5);">
+  <div class="modal-box" style="width:680px;">
+    <div class="modal-head">
+      <span class="modal-title" id="spTitle">세부과제</span>
+      <button class="btn btn-outline text-sm" onclick="closeSpModal()">✕ 닫기</button>
+    </div>
+    <div class="modal-body" id="spBody"></div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" onclick="closeSpModal()">취소</button>
+      <button class="btn btn-primary" id="spSaveBtn" onclick="saveSubproject()" disabled>저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- 일자 모달 -->
+<div class="modal-wrap" id="dateModal" style="z-index:400; background:rgba(0,0,0,.6);">
+  <div class="modal-box" style="width:440px;">
+    <div class="modal-head">
+      <span class="modal-title">예정 컨설팅 일자</span>
+      <button class="btn btn-outline text-sm" onclick="closeDateModal()">✕ 닫기</button>
+    </div>
+    <div class="modal-body" id="dmBody"></div>
+    <div class="modal-foot">
+      <button class="btn btn-outline" onclick="closeDateModal()">취소</button>
+      <button class="btn btn-primary" onclick="saveDateModal()">저장</button>
+    </div>
+  </div>
+</div>
+
+<script src="../js/main.js"></script>
+<script src="../js/subproject-ui.js"></script>
+</body>
+</html>
