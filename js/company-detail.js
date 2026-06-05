@@ -2,9 +2,33 @@
 
 // ── 컨설턴트 목록 (드롭다운용) ──
 const CONSULTANT_LIST = [
-  '김전문', '이컨설턴트', '박전문가', '최자문위원',
-  '정컨설팅', '한전문위원', '윤수석컨설턴트', '임선임위원',
+  { name: '김전문',         type: '내부', grade: '특급' },
+  { name: '이컨설턴트',     type: '외부', grade: '중급' },
+  { name: '박전문가',       type: '외부', grade: '특급' },
+  { name: '최자문위원',     type: '내부', grade: '특급' },
+  { name: '정컨설팅',       type: '외부', grade: '중급' },
+  { name: '한전문위원',     type: '내부', grade: '중급' },
+  { name: '윤수석컨설턴트', type: '외부', grade: '특급' },
+  { name: '임선임위원',     type: '외부', grade: '중급' },
 ];
+
+function getConsultantType(name) {
+  return CONSULTANT_LIST.find(c => c.name === name)?.type || '외부';
+}
+
+function getConsultantGrade(name) {
+  return CONSULTANT_LIST.find(c => c.name === name)?.grade || '중급';
+}
+
+const GRADE_RATES = { '특급': 500000, '중급': 300000 };
+
+function calcTotalLaborCost(p) {
+  return [
+    ...(p.consultants || []),
+    ...(p.directSubs || []).flatMap(s => s.consultants || []),
+    ...(p.consultingSubs || []).flatMap(s => s.consultants || []),
+  ].reduce((sum, c) => sum + (GRADE_RATES[c.grade || getConsultantGrade(c.name)] || 0) * (c.md || 0), 0);
+}
 
 const KPI_META = [
   {v:'불량률',        t:'망소'}, {v:'유저이탈율',    t:'망소'},
@@ -24,18 +48,19 @@ const DEFAULT_PROJECTS = [
     name: '생산공정 불량률 개선',
     supportType: '생산혁신',
     subTypes: ['p','q1'],
-    hasConsulting: false,
+    hasConsulting: true,
     problem: '현재 불량률이 높아 생산성이 저하되고 있음',
     summary: '스마트 센서 도입을 통한 실시간 불량 감지 시스템 구축',
     goal: '불량률 50% 감소 달성',
     kpis: [{v:'불량률', t:'망소', before:200, target:100, isMain:true}],
+    consultants: [{ id:5, name:'최자문위원', type:'내부', md:3, dates:['2026-06-05','2026-06-12','2026-06-19'] }],
     directSubs: [{
       id: 1, name: '스마트 센서 직접지원',
       kpis: [{v:'생산성', t:'망대', before:80, target:120, isMain:false}],
-      consultants: [{id:10, name:'김전문', md:2, dates:['2026-06-10','2026-06-17']}],
+      consultants: [{id:10, name:'김전문', type:'내부', md:2, dates:['2026-06-10','2026-06-17']}],
       items: [{id:11, name:'스마트 비전 센서', date:'2026-06-01', amount:5000000, files:[]}]
     }],
-    consultingSubs: [],
+    consultingSubs: [{ id:2, name:'공정 컨설팅', kpis:[], consultants:[{id:12, name:'이컨설턴트', type:'외부', md:4, dates:[]}], items:[] }],
     budget: { directSupport: 15000000, printCost: 500000, meetingCost: 300000, indirectCost: 200000 },
   }
 ];
@@ -146,15 +171,17 @@ function buildKpiCell(p) {
 
 /* 예산 셀 */
 function buildBudgetCell(p) {
-  const b = p.budget || {};
+  const b      = p.budget || {};
+  const labor  = calcTotalLaborCost(p);
   const direct = b.directSupport || 0;
   const op     = (b.printCost || 0) + (b.meetingCost || 0);
   const ind    = b.indirectCost || 0;
-  const total  = direct + op + ind;
+  const total  = labor + direct + op + ind;
   if (total === 0) return '<span class="text-sub" style="font-size:12px;">—</span>';
   const fmt = v => v > 0 ? v.toLocaleString() + '원' : null;
   const lines = [
     `<div style="font-size:12px;font-weight:700;">합계 ${fmt(total)}</div>`,
+    labor  > 0 ? `<div style="font-size:11px;color:var(--text-sub);">인건비 ${fmt(labor)}</div>` : '',
     direct > 0 ? `<div style="font-size:11px;color:var(--text-sub);">직접지원비 ${fmt(direct)}</div>` : '',
     op     > 0 ? `<div style="font-size:11px;color:var(--text-sub);">사업운영비 ${fmt(op)}</div>` : '',
     ind    > 0 ? `<div style="font-size:11px;color:var(--text-sub);">간접비 ${fmt(ind)}</div>` : '',
@@ -164,23 +191,51 @@ function buildBudgetCell(p) {
 
 /* 세부과제 셀: 유형·이름·품목·컨설턴트 */
 function buildSubCell(p) {
+  let html = '';
+
+  // 대표과제 컨설턴트
+  if (p.consultants?.length) {
+    const lines = p.consultants.map(c => {
+      const type      = c.type || getConsultantType(c.name);
+      const typeBadge = `<span class="badge ${type === '내부' ? 'badge-active' : 'badge-default'}" style="font-size:9px;margin-right:3px;">${type}</span>`;
+      const internalTag = type === '내부'
+        ? `<span style="font-size:9px;background:#dbeafe;border:1px solid #93c5fd;border-radius:3px;padding:1px 5px;color:#1d4ed8;font-weight:600;margin-left:4px;">연계사업 관리</span>`
+        : '';
+      return `<div style="font-size:11px;line-height:1.8;">${typeBadge}<strong>${escHtml(c.name||'?')}</strong> <span class="text-sub">${c.md||0}MD</span>${internalTag}</div>`;
+    }).join('');
+    html += `<div style="margin-bottom:8px;">
+      <div style="font-size:9px;font-weight:700;color:var(--text-sub);text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;">대표과제 컨설턴트</div>
+      ${lines}
+    </div>`;
+  }
+
+  // 세부과제
   const all = [
-    ...(p.directSubs || []).map(s => ({ ...s, type: 'direct' })),
-    ...(p.consultingSubs || []).map(s => ({ ...s, type: 'consulting' })),
+    ...(p.directSubs || []).map(s => ({ ...s, subKind: 'direct' })),
+    ...(p.consultingSubs || []).map(s => ({ ...s, subKind: 'consulting' })),
   ];
-  if (!all.length) return '<span class="text-sub" style="font-size:12px;">—</span>';
-  return all.map(sub => {
-    const typeLabel = sub.type === 'direct' ? '직접지원' : '컨설팅';
+  if (!all.length && !html) return '<span class="text-sub" style="font-size:12px;">—</span>';
+
+  html += all.map(sub => {
+    const typeLabel = sub.subKind === 'direct' ? '직접지원' : '컨설팅';
     const typeBadge = `<span style="font-size:9px;background:var(--accent-bg);border:1px solid var(--border);border-radius:3px;padding:1px 4px;margin-right:4px;">${typeLabel}</span>`;
     const nameLine  = `<div style="font-size:12px;font-weight:600;line-height:1.8;">${typeBadge}${escHtml(sub.name || '—')}</div>`;
-    const itemLine  = (sub.type === 'direct' && sub.items?.length)
+    const itemLine  = (sub.subKind === 'direct' && sub.items?.length)
       ? `<div style="font-size:11px;color:var(--text-sub);padding-left:4px;">품목: ${sub.items.map(it => escHtml(it.name)).join(', ')}</div>`
       : '';
     const consultLine = sub.consultants?.length
-      ? `<div style="font-size:11px;color:var(--text-sub);padding-left:4px;">컨설턴트: ${sub.consultants.map(c => `${escHtml(c.name)} (${c.md}MD)`).join(', ')}</div>`
+      ? `<div style="font-size:11px;color:var(--text-sub);padding-left:4px;">컨설턴트: ${sub.consultants.map(c => {
+          const type = c.type || getConsultantType(c.name);
+          const internalTag = type === '내부'
+            ? `<span style="font-size:9px;background:#dbeafe;border:1px solid #93c5fd;border-radius:3px;padding:1px 4px;color:#1d4ed8;font-weight:600;margin-left:3px;">연계사업 관리</span>`
+            : '';
+          return `${escHtml(c.name)} [${type}] (${c.md}MD)${internalTag}`;
+        }).join(', ')}</div>`
       : '';
     return `<div style="margin-bottom:6px;">${nameLine}${itemLine}${consultLine}</div>`;
   }).join('');
+
+  return html || '<span class="text-sub" style="font-size:12px;">—</span>';
 }
 
 function renderTable() {
@@ -204,7 +259,7 @@ function renderTable() {
   const rows = projects.map((p, i) => {
     const subBadge = p.hasConsulting
       ? '<span class="badge badge-default">컨설팅+직접지원</span>'
-      : '<span class="badge badge-default">직접지원</span>';
+      : '<span class="badge badge-default">컨설팅</span>';
     const subTypePills = p.subTypes.map(t =>
       `<span class="badge badge-default" style="font-size:10px;padding:1px 5px;">${t.toUpperCase()}</span>`
     ).join(' ');
@@ -252,8 +307,8 @@ function openProjectModal(id = null) {
     document.getElementById('pmTitle').textContent = '과제 수정';
   } else {
     currentProject = {
-      id: null, name: '', supportType: '', subTypes: [], hasConsulting: false,
-      problem: '', summary: '', goal: '', kpis: [],
+      id: null, name: '', supportType: '', subTypes: [], hasConsulting: false, /* hasConsulting = hasDirect */
+      problem: '', summary: '', goal: '', kpis: [], consultants: [],
       directSubs: [], consultingSubs: [],
       budget: { directSupport: 0, printCost: 0, meetingCost: 0, indirectCost: 0 },
     };
@@ -301,13 +356,13 @@ function renderProjectForm() {
       <div>
         <label class="label">지원구분</label>
         <div class="row" style="gap:8px; flex-wrap:wrap; align-items:center;">
-          <label class="cb-pill">
-            <input type="checkbox" id="pmChkConsulting" ${cp.hasConsulting ? 'checked' : ''}
-                   onchange="onPmConsulting()"> 컨설팅
+          <label class="cb-pill disabled" title="컨설팅은 항상 포함됩니다">
+            <input type="checkbox" id="pmChkConsulting" checked
+                   onclick="onPmConsultingClick(event)"> 컨설팅
           </label>
-          <label class="cb-pill disabled" title="직접지원은 항상 포함됩니다">
-            <input type="checkbox" id="pmChkDirect" checked
-                   onclick="onPmDirectClick(event)"> 직접지원
+          <label class="cb-pill">
+            <input type="checkbox" id="pmChkDirect" ${cp.hasConsulting ? 'checked' : ''}
+                   onchange="onPmDirect()"> 직접지원
           </label>
         </div>
       </div>
@@ -340,19 +395,22 @@ function renderProjectForm() {
     <table class="table inline-table" style="margin-top:4px;margin-bottom:20px;table-layout:fixed;width:100%;">
       <thead>
         <tr>
-          <th rowspan="2" style="vertical-align:middle;text-align:center;width:22%;">직접지원비</th>
+          <th rowspan="2" style="vertical-align:middle;text-align:center;width:17%;">인건비 <span style="font-weight:400;font-size:10px;color:var(--text-sub);">(자동)</span></th>
+          <th rowspan="2" style="vertical-align:middle;text-align:center;width:17%;">직접지원비</th>
           <th colspan="2" style="text-align:center;border-bottom:1px solid var(--border);">사업운영비</th>
-          <th style="text-align:center;width:20%;">간접비</th>
-          <th rowspan="2" style="vertical-align:middle;text-align:center;width:18%;">합계</th>
+          <th style="text-align:center;width:14%;">간접비</th>
+          <th rowspan="2" style="vertical-align:middle;text-align:center;width:15%;">합계</th>
         </tr>
         <tr>
-          <th style="text-align:center;width:18%;font-weight:500;color:var(--text-sub);">인쇄비</th>
-          <th style="text-align:center;width:18%;font-weight:500;color:var(--text-sub);">회의비</th>
+          <th style="text-align:center;width:14%;font-weight:500;color:var(--text-sub);">인쇄비</th>
+          <th style="text-align:center;width:14%;font-weight:500;color:var(--text-sub);">회의비</th>
           <th style="text-align:center;font-weight:500;color:var(--text-sub);">기술임치</th>
         </tr>
       </thead>
       <tbody>
         <tr>
+          <td style="padding:6px 10px;text-align:right;font-size:12px;background:var(--accent-bg);"
+              id="bdLaborCost" data-value="0">—</td>
           <td style="padding:6px 8px;">
             <input class="input" type="number" id="bdDirect" min="0" step="1"
                    value="${budget.directSupport || ''}" placeholder="0"
@@ -391,35 +449,71 @@ function renderProjectForm() {
     </div>
     <div id="pmKpiTable" class="mb-16"></div>
 
+    <div class="row mb-8">
+      <span class="section-title" style="margin-bottom:0;">컨설턴트 배정 <span class="text-sub" style="font-weight:400;">(대표과제)</span></span>
+      <button class="btn btn-outline text-sm" style="margin-left:auto;"
+              onclick="addPmConsultantRow()">+ 컨설턴트 추가</button>
+    </div>
+    <div id="pmConsultantTable" class="mb-16"></div>
+
     <span class="section-title">세부과제</span>
     <div id="pmSubTable"></div>
   `;
 
   renderKpiTable('project');
+  renderPmConsultantTable();
   renderSubTable();
-  updateBudgetTotal();
+  updateLaborCost();
   validateProjectForm();
 }
 
-function onPmConsulting() {
-  currentProject.hasConsulting = document.getElementById('pmChkConsulting').checked;
+function onPmDirect() {
+  currentProject.hasConsulting = document.getElementById('pmChkDirect').checked;
   renderSubTable();
   validateProjectForm();
 }
-function onPmDirectClick(e) {
+function onPmConsultingClick(e) {
   e.preventDefault();
-  document.getElementById('pmChkDirect').checked = true;
-  showToast('직접지원은 항상 포함됩니다.');
+  document.getElementById('pmChkConsulting').checked = true;
+  showToast('컨설팅은 항상 포함됩니다.');
+}
+
+// ── 인건비 자동 계산 ──
+function updateLaborCost() {
+  let labor = 0;
+  const pmBody = document.getElementById('pmConsultantTable-body');
+  if (pmBody) {
+    [...pmBody.querySelectorAll('tr[data-cid]')].forEach(row => {
+      const name = row.querySelector('[data-role="cname"]')?.value;
+      const md   = parseFloat(row.querySelector('[data-role="md"]')?.value) || 0;
+      if (name) labor += (GRADE_RATES[getConsultantGrade(name)] || 0) * md;
+    });
+  }
+  if (currentProject) {
+    [...(currentProject.directSubs || []), ...(currentProject.consultingSubs || [])].forEach(s => {
+      (s.consultants || []).forEach(c => {
+        labor += (GRADE_RATES[c.grade || getConsultantGrade(c.name)] || 0) * (c.md || 0);
+      });
+    });
+  }
+  const el = document.getElementById('bdLaborCost');
+  if (el) {
+    el.dataset.value = labor;
+    el.textContent   = labor > 0 ? labor.toLocaleString() + '원' : '—';
+    el.style.color   = labor > 0 ? 'var(--text)' : 'var(--text-sub)';
+  }
+  updateBudgetTotal();
 }
 
 // ── 예산 합계 자동 계산 ──
 function updateBudgetTotal() {
+  const labor    = parseFloat(document.getElementById('bdLaborCost')?.dataset.value) || 0;
   const direct   = parseFloat(document.getElementById('bdDirect')?.value)   || 0;
   const print    = parseFloat(document.getElementById('bdPrint')?.value)    || 0;
   const meeting  = parseFloat(document.getElementById('bdMeeting')?.value)  || 0;
   const indirect = parseFloat(document.getElementById('bdIndirect')?.value) || 0;
 
-  const grand = direct + print + meeting + indirect;
+  const grand = labor + direct + print + meeting + indirect;
   const fmt   = v => v > 0 ? v.toLocaleString() + '원' : '—';
 
   const grandEl = document.getElementById('bdGrandTotal');
@@ -455,8 +549,8 @@ function renderSubTable() {
   if (!el) return;
   const cp = currentProject;
   el.innerHTML =
-    buildSubSection('direct', cp.directSubs, '직접지원 세부과제') +
-    (cp.hasConsulting ? buildSubSection('consulting', cp.consultingSubs, '컨설팅 세부과제') : '');
+    buildSubSection('consulting', cp.consultingSubs, '컨설팅 세부과제') +
+    (cp.hasConsulting ? buildSubSection('direct', cp.directSubs, '직접지원 세부과제') : '');
 }
 
 // ── 세부과제 셀 포맷 ──
@@ -481,7 +575,9 @@ function fmtConsultantCell(consultants) {
   if (!consultants?.length) return '<span class="text-sub" style="font-size:12px;">—</span>';
   return consultants.map(c => {
     const jCnt = Math.round(c.md || 0);
-    return `<div style="font-size:11px;line-height:1.7;"><strong>${escHtml(c.name||'?')}</strong> <span class="text-sub">${c.md||0}MD · ${jCnt}일지</span></div>`;
+    const type = c.type || getConsultantType(c.name);
+    const typeBadge = `<span class="badge ${type === '내부' ? 'badge-active' : 'badge-default'}" style="font-size:9px;margin-right:3px;">${type}</span>`;
+    return `<div style="font-size:11px;line-height:1.7;">${typeBadge}<strong>${escHtml(c.name||'?')}</strong> <span class="text-sub">${c.md||0}MD · ${jCnt}일지</span></div>`;
   }).join('');
 }
 
@@ -549,12 +645,13 @@ function saveProject() {
   const cp = currentProject;
   cp.name          = document.getElementById('pmName')?.value?.trim() || '';
   cp.supportType   = document.getElementById('pmSupportType')?.value || '';
-  cp.hasConsulting = document.getElementById('pmChkConsulting')?.checked || false;
+  cp.hasConsulting = document.getElementById('pmChkDirect')?.checked || false;
   cp.problem       = document.getElementById('pmProblem')?.value || '';
   cp.summary       = document.getElementById('pmSummary')?.value || '';
   cp.goal          = document.getElementById('pmGoal')?.value || '';
   cp.subTypes      = [...document.querySelectorAll('[name="pmSubType"]:checked')].map(e => e.value);
   cp.kpis          = collectInlineKpis('project');
+  cp.consultants   = collectPmConsultants();
   cp.budget        = {
     directSupport: parseFloat(document.getElementById('bdDirect')?.value)   || 0,
     printCost:     parseFloat(document.getElementById('bdPrint')?.value)    || 0,
@@ -679,6 +776,7 @@ function saveSubModal() {
 
   closeSubModal();
   renderSubTable();
+  updateLaborCost();
   validateProjectForm();
   showToast('세부과제가 저장되었습니다.');
 }
@@ -951,13 +1049,19 @@ function buildConsultantInlineRowHtml(c, cid) {
     : '—';
 
   const consultantOpts = CONSULTANT_LIST.map(n =>
-    `<option value="${escHtml(n)}"${c?.name === n ? ' selected' : ''}>${escHtml(n)}</option>`
+    `<option value="${escHtml(n.name)}"${c?.name === n.name ? ' selected' : ''}>${escHtml(n.name)} [${n.type}] [${n.grade}]</option>`
   ).join('');
+
+  const selectedType = c?.type || (c?.name ? getConsultantType(c.name) : '');
+  const typeBadgeHtml = selectedType
+    ? `<span class="badge ${selectedType === '내부' ? 'badge-active' : 'badge-default'}" style="font-size:10px;">${selectedType}</span>`
+    : '<span class="text-sub" style="font-size:12px;">—</span>';
 
   return `<tr data-cid="${cid}" data-dates="${datesJson}">
     <td style="padding:4px 6px;">
       <select class="select" data-role="cname"
-              style="font-size:12px;padding:5px 24px 5px 8px;">
+              style="font-size:12px;padding:5px 24px 5px 8px;"
+              onchange="onConsultantChange('${cid}')">
         <option value="">선택하세요</option>${consultantOpts}
       </select>
     </td>
@@ -984,6 +1088,10 @@ function buildConsultantInlineRowHtml(c, cid) {
   </tr>`;
 }
 
+function onConsultantChange(cid) {
+  updateLaborCost();
+}
+
 function addConsultantInlineRow() {
   const body = document.getElementById('smConsultantTable-body');
   if (!body) return;
@@ -994,11 +1102,52 @@ function addConsultantInlineRow() {
 }
 
 function removeConsultantInlineRow(cid) {
-  document.querySelector(`tr[data-cid="${cid}"]`)?.remove();
-  const body = document.getElementById('smConsultantTable-body');
-  if (body && !body.querySelector('tr[data-cid]'))
-    body.insertAdjacentHTML('beforeend', emptyRow(5, 'smConsultantTable-empty'));
-  validateSubForm();
+  const tr = document.querySelector(`tr[data-cid="${cid}"]`);
+  if (!tr) return;
+  const body = tr.closest('tbody');
+  tr.remove();
+  if (body && !body.querySelector('tr[data-cid]')) {
+    body.insertAdjacentHTML('beforeend', emptyRow(5, body.id + '-empty'));
+  }
+  if (body?.id === 'smConsultantTable-body') validateSubForm();
+}
+
+function addPmConsultantRow() {
+  const body = document.getElementById('pmConsultantTable-body');
+  if (!body) return;
+  document.getElementById('pmConsultantTable-body-empty')?.remove();
+  const cid = numId();
+  body.insertAdjacentHTML('beforeend', buildConsultantInlineRowHtml(null, cid));
+}
+
+function renderPmConsultantTable() {
+  const el = document.getElementById('pmConsultantTable');
+  if (!el) return;
+  const consultants = currentProject.consultants || [];
+  const rows   = consultants.map(c => buildConsultantInlineRowHtml(c, numId())).join('');
+  const emptyTr = consultants.length ? '' : emptyRow(5, 'pmConsultantTable-body-empty');
+  el.innerHTML = `<table class="table inline-table" style="margin-top:4px;">
+    <thead><tr>
+      <th>컨설턴트명</th>
+      <th style="width:100px;">MD</th>
+      <th style="width:80px;">수행일지</th>
+      <th style="width:170px;">예정일자</th>
+      <th style="width:52px;"></th>
+    </tr></thead>
+    <tbody id="pmConsultantTable-body">${rows}${emptyTr}</tbody>
+  </table>`;
+}
+
+function collectPmConsultants() {
+  const body = document.getElementById('pmConsultantTable-body');
+  if (!body) return [];
+  return [...body.querySelectorAll('tr[data-cid]')].map(row => {
+    const cid   = row.dataset.cid;
+    const md    = Math.round((parseFloat(row.querySelector('[data-role="md"]')?.value) || 0) * 2) / 2;
+    const dates = JSON.parse(row.dataset.dates || '[]');
+    const name  = row.querySelector('[data-role="cname"]')?.value?.trim() || '';
+    return { id: parseInt(cid), name, type: name ? getConsultantType(name) : '외부', md, dates };
+  });
 }
 
 function onCMdInput(cid) {
@@ -1006,6 +1155,7 @@ function onCMdInput(cid) {
   const cnt = Math.round(v);
   const jEl = document.getElementById(`cjournal-${cid}`);
   if (jEl) jEl.innerHTML = `<span class="text-sm text-sub">${cnt > 0 ? cnt + '개' : '—'}</span>`;
+  updateLaborCost();
 }
 
 function onCMdBlur(cid) {
@@ -1022,14 +1172,11 @@ function collectInlineConsultants() {
   const body = document.getElementById('smConsultantTable-body');
   if (!body) return [];
   return [...body.querySelectorAll('tr[data-cid]')].map(row => {
-    const cid   = row.dataset.cid;
-    const md    = Math.round((parseFloat(row.querySelector('[data-role="md"]')?.value) || 0) * 2) / 2;
+    const cid  = row.dataset.cid;
+    const md   = Math.round((parseFloat(row.querySelector('[data-role="md"]')?.value) || 0) * 2) / 2;
     const dates = JSON.parse(row.dataset.dates || '[]');
-    return {
-      id:   parseInt(cid),
-      name: row.querySelector('[data-role="cname"]')?.value?.trim() || '',
-      md, dates,
-    };
+    const name = row.querySelector('[data-role="cname"]')?.value?.trim() || '';
+    return { id: parseInt(cid), name, type: name ? getConsultantType(name) : '외부', md, dates };
   });
 }
 
